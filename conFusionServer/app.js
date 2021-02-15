@@ -15,7 +15,7 @@ const mongoose = require('mongoose');
 const Dishes = require('./models/dishes');
 const { SSL_OP_CISCO_ANYCONNECT } = require('constants');
 const url = 'mongodb://localhost:27017/conFusion';
-const connect = mongoose.connect(url);
+const connect = mongoose.connect(url, { useNewUrlParser: true, useUnifiedTopology: true, useCreateIndex: true });
 
 //connection to the server
 connect.then((db) => {
@@ -34,6 +34,40 @@ app.use(logger('dev'));
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
+
+function auth(req, res, next) {
+  console.log(req.headers);
+
+  var authHeader = req.headers.authorization;
+  if (!authHeader) {
+    var err = new Error('You are not authenticated');
+    res.setHeader('WWW-Authenticate', 'Basic');
+    err.status = 401;
+    return next(err);
+  }
+  // buffer enbale me to split the string
+  // split in an array first element basic64 thats why we are looking at [1]
+  var auth = new Buffer.from(authHeader.split(' ')[1], 'base64').toString().split(':');
+
+  var username = auth[0];
+  var password = auth[1];
+
+  // just for know
+  if (username === 'admin' && password === 'password') {
+    next();
+  }
+  else {
+    var err = new Error('Wrong password or username');
+    res.setHeader('WWW-Authenticate', 'Basic');
+    err.status = 401;
+    return next(err);
+  }
+}
+
+// authentification here
+// client can't access anything without authentification
+app.use(auth);
+
 app.use(express.static(path.join(__dirname, 'public')));
 
 app.use('/', indexRouter);
