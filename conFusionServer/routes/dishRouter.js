@@ -35,7 +35,7 @@ dishRouter.route('/')
     })
 
     // post will carry information in the body of the message in the form of json data
-    .post(authenticate.verifyUser, (req, res, next) => {
+    .post(authenticate.verifyUser, authenticate.verifyAdmin, (req, res, next) => {
         //res.end('Will add the dish: ' + req.body.name + ' with details: ' + req.body.description);
         Dishes.create(req.body)
             .then((dish) => {
@@ -48,12 +48,12 @@ dishRouter.route('/')
     })
 
     // doesn't make sense to update all the dishes
-    .put(authenticate.verifyUser, (req, res, next) => {
+    .put(authenticate.verifyUser, authenticate.verifyAdmin, (req, res, next) => {
         res.statusCode = 403; // 403 opperation not supported
         res.end('PUT operation not supported on /dishes');
     })
 
-    .delete(authenticate.verifyUser, (req, res, next) => {
+    .delete(authenticate.verifyUser, authenticate.verifyAdmin, (req, res, next) => {
         //res.end('Deleting all the dishes!');
         Dishes.remove({})
             .then((resp) => {
@@ -72,7 +72,7 @@ dishRouter.route('/:dishId')
         //res.end('Will send you the details of the dish: ' + req.params.dishId);
         // parameter retreive with req.params.dishId the name match in the end and the parameter to retreive the information correctly
         Dishes.findById(req.params.dishId)
-            .populate.apply('comments.author')
+            .populate('comments.author')
             .then((dish) => {
                 res.statusCode = 200;
                 res.setHeader('Content-Type', 'application/json');
@@ -82,12 +82,12 @@ dishRouter.route('/:dishId')
     })
 
     // doesn't make sense to do a post on a specific dishId
-    .post(authenticate.verifyUser, (req, res, next) => {
+    .post(authenticate.verifyUser, authenticate.verifyAdmin, (req, res, next) => {
         res.statusCode = 403; // 403 opperation not supported
         res.end('POST operation not supported on /dishes/' + req.params.dishId);
     })
 
-    .put(authenticate.verifyUser, (req, res, next) => {
+    .put(authenticate.verifyUser, authenticate.verifyAdmin, (req, res, next) => {
         // wirte to add a line to the reply message
         // res.write('Updating the dish: ' + req.params.dishId + '\n');
         // res.end('Will update the dish: ' + req.body.name +
@@ -103,7 +103,7 @@ dishRouter.route('/:dishId')
             .catch((err) => next(err));
     })
 
-    .delete(authenticate.verifyUser, (req, res, next) => {
+    .delete(authenticate.verifyUser, authenticate.verifyAdmin, (req, res, next) => {
         //res.end('Deleting dishe: ' + req.params.dishId);
         Dishes.findByIdAndRemove(req.params.dishId)
             .then((resp) => {
@@ -135,6 +135,7 @@ dishRouter.route('/:dishId/comments')
     })
 
     .post(authenticate.verifyUser, (req, res, next) => {
+        console.log(req.user);
         Dishes.findById(req.params.dishId)
             .then((dish) => {
                 if (dish != null) {
@@ -167,7 +168,7 @@ dishRouter.route('/:dishId/comments')
             + req.params.dishId + '/comments');
     })
 
-    .delete(authenticate.verifyUser, (req, res, next) => {
+    .delete(authenticate.verifyUser, authenticate.verifyAdmin, (req, res, next) => {
         Dishes.findById(req.params.dishId)
             .then((dish) => {
                 if (dish != null) {
@@ -227,6 +228,14 @@ dishRouter.route('/:dishId/comments/:commentId')
     .put(authenticate.verifyUser, (req, res, next) => {
         Dishes.findById(req.params.dishId)
             .then((dish) => {
+                if (!(req.user._id.equals(dish.comments.id(req.params.commentId).author))) {
+                    console.log(req.user._id);
+                    console.log(dish.comments.id(req.params.commentId).author);
+                    console.log(dish.comments);
+                    err = new Error('Operation not authorized!');
+                    err.status = 404;
+                    return next(err);
+                }
                 if (dish != null && dish.comments.id(req.params.commentId) != null) {
                     if (req.body.rating) {
                         dish.comments.id(req.params.commentId).rating = req.body.rating;
@@ -262,8 +271,17 @@ dishRouter.route('/:dishId/comments/:commentId')
     })
 
     .delete(authenticate.verifyUser, (req, res, next) => {
+
         Dishes.findById(req.params.dishId)
             .then((dish) => {
+                if (!(req.user._id.equals(dish.comments.id(req.params.commentId).author))) {
+                    console.log(req.user._id);
+                    console.log(dish.comments.id(req.params.commentId).author);
+                    console.log(dish.comments);
+                    err = new Error('Operation not authorized!');
+                    err.status = 404;
+                    return next(err);
+                }
                 if (dish != null && dish.comments.id(req.params.commentId) != null) {
                     dish.comments.id(req.params.commentId).remove();
                     // after modifying the dish save it
